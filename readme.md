@@ -1,6 +1,6 @@
 ## OpenObserve
 
-##### 本库是一个用于日志收集的 Go 语言组件库，支持异步和同步发送日志数据到指定的[OpenObserve](https://github.com/openobserve/openobserve)。该库提供了灵活的配置选项，包括基本认证、授权、请求超时、索引名称等。
+#### 本库是一个用于日志收集的 Go 语言组件库，支持异步和同步发送日志数据到指定的[OpenObserve](https://github.com/openobserve/openobserve)。该库提供了灵活的配置选项，包括基本认证、授权、请求超时、索引名称等。
 
 ## 安装
 
