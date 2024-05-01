@@ -35,7 +35,13 @@ func main() {
         openobserve.WithAuthorization("token"))
 
     // 发送日志数据
-    log.Send("Hello, World!")
+    log.Send(map[string]any{
+			"_timestamp": time.Now().UnixMicro(),
+			"name":       "xuhui",
+			"message":    "你好",
+			"log":        "ip-10-2-56-221.us-east-2.compute.internal",
+			"i":          i,
+		})
 }
 
 ```
