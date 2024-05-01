@@ -7,7 +7,7 @@
 ### 使用以下命令可以安装组件库：
 
 ```go
-`go get -u github.com/iamxvbaba/openobserve`
+go get -u github.com/iamxvbaba/openobserve
 ```
 
 ## 使用示例
