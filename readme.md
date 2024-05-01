@@ -4,9 +4,11 @@
 
 ## 安装
 
-##### 使用以下命令可以安装组件库：
+### 使用以下命令可以安装组件库：
 
+```go
 `go get -u github.com/iamxvbaba/openobserve`
+```
 
 ## 使用示例
 
@@ -26,11 +28,11 @@ func main() {
     ctx := context.Background()
 
     // 创建 OpenObLog 实例
-    log := openobserve.New(ctx, "http://your-logging-server.com/api", 
+    log := openobserve.New(ctx, "http://localhost:5080", 
         openobserve.WithFullSize(100),
         openobserve.WithRequestTimeout(time.Second * 5),
         openobserve.WithIndexName("logs", true),
-        openobserve.WithAuthorization("your-api-token"))
+        openobserve.WithAuthorization("token"))
 
     // 发送日志数据
     log.Send("Hello, World!")
