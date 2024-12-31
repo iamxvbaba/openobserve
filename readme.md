@@ -61,6 +61,7 @@ func main() {
 - `WithWaitTime`: 每过指定时间发起请求。
 - `WithRequestTimeout`: 设置 HTTP 请求超时时间。
 - `WithIndexName`: 设置索引名称，并指定是否按天切割索引。
+- `WithCompress`: 对请求报文进行 gzip 压缩。
 
 ## 方法
 

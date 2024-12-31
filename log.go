@@ -2,6 +2,7 @@ package openobserve
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -31,6 +32,9 @@ type OpenObLog struct {
 	fullSize       int // 达到此数量时不再等waitTime到期,直接写出
 	waitTime       time.Duration
 	requestTimeout time.Duration
+
+	compress      bool // 请求报文进行gzip压缩传输
+	compressLevel int  // 请求报文gzip压缩级别，-1~9，0：不压缩，9：最高压缩，-1：默认压缩
 
 	everyDayCut bool
 	indexName   string
@@ -89,6 +93,29 @@ func buildLastName(name string) string {
 	return fmt.Sprintf("%s_%s", name,
 		time.Now().Format("20060102"))
 }
+
+// WithCompress 请求报文gzip压缩
+func WithCompress(compress bool, compressLevel ...int) Option {
+	// 如果没有传递 compressLevel 参数，则使用默认值 -1
+	var level int
+	if len(compressLevel) > 0 {
+		level = compressLevel[0]
+
+		// 验证 compressLevel 是否在有效范围 -1 到 9 之间
+		if level < -1 || level > 9 {
+			log.Println("Invalid compress level:", level, "Valid range is -1 to 9")
+			level = -1 // 设置为默认值
+		}
+	} else {
+		level = -1 // 默认压缩级别
+	}
+
+	return func(log *OpenObLog) {
+		log.compress = compress
+		log.compressLevel = level
+	}
+}
+
 func New(ctx context.Context, addr string, options ...Option) *OpenObLog {
 	l := &OpenObLog{
 		Mutex:          &sync.Mutex{},
@@ -149,22 +176,55 @@ func (l *OpenObLog) run() {
 }
 
 func (l *OpenObLog) request(obj any) bool {
+	// 首先将日志对象序列化为 JSON 格式
 	data, err := json.Marshal(obj)
 	if err != nil {
 		log.Println("OpenObLog.request json.Marshal:", err)
 		return false
 	}
+
+	// 发送缓冲区
+	var buf bytes.Buffer
+
+	// 预设一个标志，判断请求报文是否进行压缩
+	bReqCompress := false
+
+	// 如果启用压缩且压缩级别有效，进行压缩
+	if l.compress {
+		gz, err := gzip.NewWriterLevel(&buf, l.compressLevel)
+		if err != nil {
+			log.Println("OpenObLog.request gzip.NewWriterLevel:", err)
+		} else {
+			// 压缩数据
+			if _, err = gz.Write(data); err != nil {
+				log.Println("OpenObLog.request gzip compression:", err)
+				buf.Reset()
+			}
+			gz.Close()
+			bReqCompress = true
+		}
+	}
+
+	if !bReqCompress {
+		// 如果没有启用压缩，直接发送原始数据
+		buf.Write(data)
+	}
+
+	// 根据每日报表切换索引名称
 	indexName := l.indexName
 	if l.everyDayCut {
 		indexName = buildLastName(l.indexName)
 	}
+
+	// 创建 HTTP 请求，使用 buf 作为请求体
 	req, err := http.NewRequest(http.MethodPost,
 		fmt.Sprintf("%s/api/default/%s/_json", l.addr, indexName),
-		bytes.NewReader(data))
+		&buf)
 	if err != nil {
 		log.Println("OpenObLog.request NewRequest:", err)
 		return false
 	}
+
 	req.Header.Set("Content-Type", "application/json")
 	if l.authorization != nil {
 		req.Header.Set("Authorization", *l.authorization)
@@ -172,19 +232,30 @@ func (l *OpenObLog) request(obj any) bool {
 	if l.basicAuth != nil {
 		req.SetBasicAuth(l.basicAuth.username, l.basicAuth.password)
 	}
+
+	// 设置 Content-Encoding 为 gzip（如果启用了压缩）
+	if bReqCompress {
+		req.Header.Set("Content-Encoding", "gzip")
+	}
+
+	// 发送 HTTP 请求
 	response, err := l.httpc.Do(req)
 	if err != nil {
 		log.Println("OpenObLog.request DoRequest:", err)
 		return false
 	}
 	defer response.Body.Close()
+
+	// 检查响应状态
 	if response.StatusCode == http.StatusOK {
 		return true
 	}
+
 	body, _ := io.ReadAll(response.Body)
 	log.Println("OpenObLog.request request error:", string(body))
 	return false
 }
+
 func (l *OpenObLog) send(data any) {
 	if data == nil {
 		return
