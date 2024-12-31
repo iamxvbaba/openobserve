@@ -25,7 +25,12 @@ import (
 
 func main() {
     // 创建一个上下文
-    ctx := context.Background()
+    ctx, cancel := context.WithCancel(context.Background())
+    defer func() {
+        cancel()
+        // 确保缓存区数据能发送完成
+        time.Sleep(3 * time.Second)
+    }
 
     // 创建 OpenObLog 实例
     log := openobserve.New(ctx, "http://localhost:5080", 
@@ -34,7 +39,7 @@ func main() {
         openobserve.WithIndexName("logs", true),
         openobserve.WithAuthorization("token"))
 
-    // 发送日志数据
+    // 异步发送日志数据
     log.Send(map[string]any{
 			"_timestamp": time.Now().UnixMicro(),
 			"name":       "xuhui",
