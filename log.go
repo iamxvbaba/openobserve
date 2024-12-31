@@ -121,7 +121,6 @@ func New(ctx context.Context, addr string, options ...Option) *OpenObLog {
 		Mutex:          &sync.Mutex{},
 		ctx:            ctx,
 		addr:           addr,
-		c:              make(chan any, 16),
 		fullSize:       16,
 		waitTime:       0,
 		requestTimeout: time.Second * 10,
@@ -133,6 +132,7 @@ func New(ctx context.Context, addr string, options ...Option) *OpenObLog {
 	l.httpc = &http.Client{}
 	l.httpc.Timeout = l.requestTimeout
 	l.list = make([]any, 0, l.fullSize)
+	l.c = make(chan any, l.fullSize*2) // 管道长度是缓冲区2倍，增加冗余，防止刷缓冲区的时候，发送协程被阻塞
 
 	l.run()
 	return l
@@ -142,10 +142,6 @@ func (l *OpenObLog) run() {
 		for {
 			select {
 			case val := <-l.c:
-				if l.waitTime <= 0 {
-					l.send(val)
-					continue
-				}
 				l.Lock()
 				l.list = append(l.list, val)
 				l.Unlock()
@@ -268,8 +264,8 @@ func (l *OpenObLog) sendList() {
 	if len(l.list) == 0 {
 		return
 	}
-	if l.request(l.list) {
-		l.list = l.list[:0]
+	if l.request(l.list) || len(l.list) > l.fullSize*10 {
+		l.list = l.list[:0] // 如果多次发送失败，应及时清除缓存，防止积攒在内存造成业务异常 TODO：增加可选参数
 	}
 }
 
