@@ -252,12 +252,6 @@ func (l *OpenObLog) request(obj any) bool {
 	return false
 }
 
-func (l *OpenObLog) send(data any) {
-	if data == nil {
-		return
-	}
-	l.request(data)
-}
 func (l *OpenObLog) sendList() {
 	l.Lock()
 	defer l.Unlock()
@@ -271,6 +265,9 @@ func (l *OpenObLog) sendList() {
 
 // SendSync 同步发送
 func (l *OpenObLog) SendSync(data any) bool {
+	if data == nil {
+		return
+	}
 	return l.request(data)
 }
 
